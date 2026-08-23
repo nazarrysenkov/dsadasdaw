@@ -1,11 +1,11 @@
 {
-  "main": "server.js",
+  "main": "build/server-obf.js",
   "output": "build/sea-prep.blob",
   "disableExperimentalSEAWarning": true,
   "useSnapshot": false,
   "useCodeCache": true,
   "assets": {
-    "index.html": "index.html",
-    "moonai.html": "moonai.html"
+    "index.html": "build/pages/index.html",
+    "moonai.html": "build/pages/moonai.html"
   }
 }

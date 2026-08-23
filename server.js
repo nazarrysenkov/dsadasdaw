@@ -87,6 +87,10 @@ const HOST = pick('HOST', '0.0.0.0');
 
 let activeKey = 0;
 const RETRY_STATUS = new Set([401, 402, 403, 429]);
+/* пауза для ключа после ошибки: баланс/доступ — 10 минут, лимит частоты — минута */
+const COOLDOWN_LONG = 10 * 60 * 1000;
+const COOLDOWN_SHORT = 60 * 1000;
+const keyPausedUntil = new Array(32).fill(0);
 
 /* ---------- ограничения: на IP в минуту и на всех в сутки ---------- */
 const perIp = new Map();
@@ -140,23 +144,29 @@ function applyCors(req, res) {
   }
 }
 
-function serveStatic(req, res) {
-  let rel = decodeURIComponent(req.url.split('?')[0]);
-  if (rel === '/' || rel === '') rel = '/index.html';
+/* раздаётся строго этот список — никаких .env, server.js и прочего с диска */
+const STATIC_ROUTES = new Map([
+  ['/', 'index.html'],
+  ['/index.html', 'index.html'],
+  ['/moonai.html', 'moonai.html']
+]);
 
-  const clean = path.normalize(rel).replace(/^([/\\])+/, '');
-  const full = path.join(ROOT, clean);
-  const type = TYPES[path.extname(clean).toLowerCase()] || 'application/octet-stream';
+function serveStatic(req, res) {
+  const route = req.url.split('?')[0].toLowerCase();
+  const name = STATIC_ROUTES.get(route);
+  if (!name) { send(res, 404, 'text/plain; charset=utf-8', 'Не найдено'); return; }
+  const type = TYPES['.html'];
 
   /* сначала файл рядом с сервером — так страницы можно править без пересборки */
-  if (full.startsWith(ROOT) && fs.existsSync(full) && fs.statSync(full).isFile()) {
+  const full = path.join(ROOT, name);
+  if (fs.existsSync(full) && fs.statSync(full).isFile()) {
     res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
     fs.createReadStream(full).pipe(res);
     return;
   }
 
   /* затем встроенная в исполняемый файл копия */
-  const asset = embedded(clean.replace(/\\/g, '/'));
+  const asset = embedded(name);
   if (asset) { send(res, 200, type, asset); return; }
 
   send(res, 404, 'text/plain; charset=utf-8', 'Не найдено');
@@ -214,10 +224,26 @@ async function handleChat(req, res) {
   });
 
   let answer = null;
-  let lastStatus = 0;
 
-  for (let attempt = 0; attempt < CONFIG.keys.length; attempt++) {
-    const index = (activeKey + attempt) % CONFIG.keys.length;
+  /* порядок обхода: начинаем со следующего после прошлого успеха,
+     ключи на паузе (пустой баланс, лимит) пропускаем */
+  const now = Date.now();
+  const candidates = [];
+  for (let i = 0; i < CONFIG.keys.length; i++) {
+    const idx = (activeKey + i) % CONFIG.keys.length;
+    if (keyPausedUntil[idx] > now) continue;
+    candidates.push(idx);
+  }
+
+  if (!candidates.length) {
+    console.error('[moonai] ВСЕ КЛЮЧИ НА ПАУЗЕ (баланс/лимиты). Запрос отклонён.');
+    fail(res, 503, 'Сервер перегружен. Попробуйте позже.');
+    return;
+  }
+
+  const attempts = [];
+
+  for (const index of candidates) {
     try {
       const response = await fetch(CONFIG.baseURL + '/chat/completions', {
         method: 'POST',
@@ -233,23 +259,32 @@ async function handleChat(req, res) {
         signal: upstream.signal
       });
 
-      if (response.ok && response.body) { activeKey = index; answer = response; break; }
+      if (response.ok && response.body) {
+        /* чередование: следующий запрос начнётся с другого ключа */
+        activeKey = (index + 1) % CONFIG.keys.length;
+        keyPausedUntil[index] = 0;
+        answer = response;
+        console.log('[moonai] ключ #' + (index + 1) + ' → обработал запрос');
+        break;
+      }
 
-      lastStatus = response.status;
       const detail = await response.text().catch(() => '');
-      console.error('[moonai] ключ #' + (index + 1) + ' → ' + response.status + ' ' + detail.slice(0, 180));
-      if (!RETRY_STATUS.has(response.status)) break;
+      attempts.push('#' + (index + 1) + ' → ' + response.status);
+      if (RETRY_STATUS.has(response.status)) {
+        keyPausedUntil[index] = Date.now() +
+          (response.status === 429 ? COOLDOWN_SHORT : COOLDOWN_LONG);
+      }
+      console.error('[moonai] ключ #' + (index + 1) + ' → ' + response.status + ' ' + detail.slice(0, 160));
     } catch (e) {
       if (upstream.signal.aborted) return;
-      lastStatus = 502;
+      attempts.push('#' + (index + 1) + ' → сеть');
       console.error('[moonai] ключ #' + (index + 1) + ' → сбой связи: ' + (e.message || 'нет связи'));
     }
   }
 
   if (!answer) {
-    fail(res, lastStatus === 429 ? 429 : 502, lastStatus === 429
-      ? 'Лимит запросов у всех ключей исчерпан. Попробуйте позже.'
-      : 'Модель недоступна' + (lastStatus ? ' (код ' + lastStatus + ')' : '') + '.');
+    console.error('[moonai] НИ ОДИН КЛЮЧ НЕ СРАБОТАЛ (' + attempts.join(', ') + '). Балансы и лимиты исчерпаны?');
+    fail(res, 503, 'Сервер перегружен. Попробуйте позже.');
     return;
   }
 

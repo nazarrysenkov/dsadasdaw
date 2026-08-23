@@ -548,7 +548,9 @@ button,input,textarea{font:inherit;color:inherit}
       if (!res.ok) {
         var detail = '';
         try { detail = (await res.text()).slice(0, 300); } catch (e) {}
-        throw new Error('Сервис ответил ' + res.status + (detail ? ': ' + detail : ''));
+        var msg = 'Сервис ответил ' + res.status + '.';
+        try { var j = JSON.parse(detail); if (j && j.error) msg = j.error; } catch (e) {}
+        throw new Error(msg);
       }
 
       var reader = res.body.getReader();
