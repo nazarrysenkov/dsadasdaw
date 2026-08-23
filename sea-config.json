@@ -1,0 +1,11 @@
+{
+  "main": "server.js",
+  "output": "build/sea-prep.blob",
+  "disableExperimentalSEAWarning": true,
+  "useSnapshot": false,
+  "useCodeCache": true,
+  "assets": {
+    "index.html": "index.html",
+    "moonai.html": "moonai.html"
+  }
+}

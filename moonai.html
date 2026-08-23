@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#050607">
+<title>Moon AI 0.1 — Moonscape</title>
+<meta name="description" content="Moon AI 0.1 — нейросеть студии Moonscape. Задайте вопрос и получите ответ в диалоге.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%2300d2ff' stroke-width='4'/%3E%3Ccircle cx='44' cy='44' r='7' fill='%239d4edd'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050607;--panel:#0b0d10;--panel-2:#12151a;--ink:#dde2e8;--muted:#7d858f;--dim:#565d66;
+  --line:rgba(160,170,185,.10);--line-2:rgba(160,170,185,.20);
+  --cyan:#9fb0bd;--violet:#7d8894;--danger:#b58585;
+  --sans:"Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+  --side:268px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button,input,textarea{font:inherit;color:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:rgba(165,175,188,.16);border-radius:8px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(165,175,188,.28);background-clip:content-box}
+
+.app{display:grid;grid-template-columns:var(--side) minmax(0,1fr);height:100dvh}
+
+/* ---------- сайдбар ---------- */
+.side{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
+.side-top{display:flex;align-items:center;gap:10px;padding:16px 16px 12px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.03em}
+.logo i{position:relative;width:20px;height:20px;border:1px solid var(--cyan);border-radius:50%;box-shadow:0 0 12px rgba(170,185,200,.24)}
+.logo i:after{content:"";position:absolute;right:1px;bottom:1px;width:7px;height:7px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet)}
+.ver{margin-left:auto;padding:3px 7px;border:1px solid var(--line-2);border-radius:20px;
+  color:var(--cyan);font-family:var(--mono);font-size:9.5px;letter-spacing:.12em}
+.side-new{margin:4px 12px 12px;display:flex}
+.chats{flex:1;min-height:0;overflow:auto;padding:0 8px 8px}
+.chat-item{display:flex;align-items:center;gap:8px;width:100%;padding:10px 10px;margin-bottom:4px;border:1px solid transparent;
+  border-radius:10px;background:transparent;text-align:left;cursor:pointer;color:var(--muted);transition:.18s}
+.chat-item:hover{background:var(--panel-2);color:var(--ink)}
+.chat-item.on{background:var(--panel-2);border-color:var(--line-2);color:var(--ink)}
+.chat-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.chat-item .del{opacity:0;padding:2px 5px;border:0;background:transparent;color:var(--dim);border-radius:6px;cursor:pointer}
+.chat-item:hover .del{opacity:1}
+.chat-item .del:hover{color:var(--danger);background:rgba(181,133,133,.1)}
+.side-foot{padding:12px;border-top:1px solid var(--line);display:grid;gap:8px}
+.side-foot a,.side-foot button{display:flex;align-items:center;gap:8px;padding:8px 10px;border:0;background:transparent;
+  border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer;transition:.18s;text-align:left}
+.side-foot a:hover,.side-foot button:hover{background:var(--panel-2);color:var(--cyan)}
+.status-line{display:flex;align-items:center;gap:7px;padding:0 10px 2px;color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.1em}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim)}
+.dot.live{background:#8ba394;box-shadow:0 0 8px #8ba394}
+.dot.warn{background:#b0a184;box-shadow:0 0 8px #b0a184}
+
+/* ---------- основная область ---------- */
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.bar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:rgba(5,6,7,.88);backdrop-filter:blur(12px)}
+.bar h1{margin:0;font-size:15px;font-weight:600;letter-spacing:-.02em}
+.bar .sub{color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.bar .spacer{margin-left:auto}
+.icon-btn{display:grid;place-items:center;width:36px;height:34px;border:1px solid var(--line);border-radius:9px;
+  background:transparent;color:var(--muted);cursor:pointer;transition:.18s}
+.icon-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.side-toggle{display:none}
+
+.scroll{flex:1;min-height:0;overflow:auto;scroll-behavior:smooth}
+.thread{width:min(760px,calc(100% - 40px));margin:0 auto;padding:28px 0 20px;display:grid;gap:22px}
+
+.msg{display:grid;grid-template-columns:30px minmax(0,1fr);gap:14px}
+.who{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-family:var(--mono);font-size:11px;
+  border:1px solid var(--line-2);color:var(--muted)}
+.msg.ai .who{border-color:rgba(170,185,200,.24);color:var(--cyan);box-shadow:0 0 14px rgba(200,215,230,.09)}
+.body{min-width:0}
+.name{margin-bottom:6px;color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase}
+.text{font-size:15.5px;word-wrap:break-word;overflow-wrap:anywhere}
+.text p{margin:0 0 12px}
+.text p:last-child{margin-bottom:0}
+.text ul,.text ol{margin:0 0 12px;padding-left:22px}
+.text li{margin:4px 0}
+.text h1,.text h2,.text h3{margin:18px 0 8px;font-size:17px;letter-spacing:-.02em}
+.text a{color:var(--cyan);text-decoration:underline;text-underline-offset:3px}
+.text code{padding:2px 5px;border:1px solid var(--line);border-radius:5px;background:rgba(165,175,188,.07);
+  font-family:var(--mono);font-size:12.5px}
+.text pre{position:relative;margin:0 0 14px;padding:14px 14px 14px;border:1px solid var(--line);border-radius:12px;
+  background:#07090b;overflow:auto}
+.text pre code{padding:0;border:0;background:none;font-size:12.5px;line-height:1.62;display:block;white-space:pre}
+.text blockquote{margin:0 0 12px;padding-left:14px;border-left:2px solid var(--line-2);color:var(--muted)}
+.copy-code{position:absolute;top:8px;right:8px;padding:4px 8px;border:1px solid var(--line);border-radius:7px;
+  background:rgba(8,12,18,.9);color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;cursor:pointer;opacity:0;transition:.18s}
+.text pre:hover .copy-code{opacity:1}
+.copy-code:hover{border-color:var(--cyan);color:var(--cyan)}
+.tools{display:flex;gap:6px;margin-top:10px;opacity:0;transition:opacity .2s}
+.msg:hover .tools{opacity:1}
+.tool{padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--dim);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;cursor:pointer;transition:.18s}
+.tool:hover{border-color:var(--cyan);color:var(--cyan)}
+.caret{display:inline-block;width:7px;height:15px;margin-left:2px;vertical-align:-2px;background:var(--cyan);
+  box-shadow:0 0 10px rgba(190,205,215,.35);animation:blink 1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:0}}
+.err{padding:12px 14px;border:1px solid rgba(181,133,133,.32);border-radius:12px;background:rgba(181,133,133,.06);color:#c4a3a3;font-size:14px}
+
+/* ---------- пустой экран ---------- */
+.hello{width:min(760px,calc(100% - 40px));margin:auto;padding:40px 0;text-align:center}
+.hello .orb{width:76px;height:76px;margin:0 auto 22px;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#e8ecef 0 4%,#b2bcc4 16%,#6d757e 52%,#2b3037 80%,#0c0e11 100%);
+  box-shadow:0 0 40px rgba(160,175,190,.16),inset -14px -12px 22px rgba(0,0,0,.5)}
+.hello h2{margin:0 0 10px;font-size:clamp(26px,3.4vw,38px);font-weight:600;letter-spacing:-.05em}
+.hello p{margin:0 auto;max-width:46ch;color:var(--muted)}
+.tips{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:28px;text-align:left}
+.tip{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;transition:.2s}
+.tip:hover{border-color:rgba(170,185,200,.24);background:var(--panel-2);transform:translateY(-2px)}
+.tip b{display:block;margin-bottom:3px;font-size:14px;font-weight:600}
+.tip span{color:var(--dim);font-size:12.5px}
+
+/* ---------- ввод ---------- */
+.composer{padding:14px 0 18px;background:linear-gradient(180deg,transparent,rgba(5,6,7,.92) 40%)}
+.composer .inner{width:min(760px,calc(100% - 40px));margin:0 auto}
+.box{display:flex;align-items:flex-end;gap:10px;padding:10px 10px 10px 16px;border:1px solid var(--line-2);
+  border-radius:16px;background:var(--panel);transition:.2s}
+.box:focus-within{border-color:rgba(170,185,200,.30);box-shadow:0 0 0 4px rgba(200,215,230,.05)}
+#input{flex:1;min-height:26px;max-height:190px;padding:4px 0;border:0;background:transparent;resize:none;outline:none;
+  font-size:15.5px;line-height:1.55}
+#input::placeholder{color:var(--dim)}
+.send{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:11px;cursor:pointer;
+  background:linear-gradient(120deg,#232a32,#1a1f26);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.5);transition:.2s}
+.send:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.send.stop{background:rgba(181,133,133,.14);color:#c4a3a3;box-shadow:none}
+.hint{display:flex;justify-content:space-between;gap:12px;margin-top:8px;color:var(--dim);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em}
+
+/* ---------- окно настроек ---------- */
+.modal{position:fixed;inset:0;z-index:50;display:none;place-items:center;background:rgba(3,4,5,.75);backdrop-filter:blur(6px)}
+.modal.on{display:grid}
+.card{width:min(460px,calc(100% - 32px));padding:24px;border:1px solid var(--line-2);border-radius:18px;background:var(--panel)}
+.card h3{margin:0 0 8px;font-size:19px;letter-spacing:-.03em}
+.card p{margin:0 0 16px;color:var(--muted);font-size:13.5px}
+.card label{display:block;margin-bottom:6px;color:var(--dim);font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase}
+.card .how{margin:0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#07090b;
+  color:var(--cyan);font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre-wrap}
+.card code{padding:1px 5px;border:1px solid var(--line);border-radius:5px;font-family:var(--mono);font-size:11.5px}
+.card .warn{margin:12px 0 0;padding:10px 12px;border:1px solid rgba(176,161,132,.3);border-radius:10px;
+  background:rgba(176,161,132,.06);color:#bfb49c;font-size:12.5px}
+.card .row{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border:1px solid var(--line-2);
+  border-radius:10px;background:transparent;font-size:13.5px;font-weight:600;cursor:pointer;transition:.2s}
+.btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn.solid{border-color:transparent;background:linear-gradient(110deg,#232a32,#1a1f26);color:#fff}
+.btn.wide{width:100%}
+
+/* ---------- адаптив ---------- */
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;z-index:40;left:0;top:0;bottom:0;width:var(--side);transform:translateX(-102%);transition:transform .25s ease}
+  body.side-open .side{transform:none}
+  body.side-open .scrim{position:fixed;inset:0;z-index:30;background:rgba(3,4,5,.7);content:""}
+  .side-toggle{display:grid}
+  .tips{grid-template-columns:1fr}
+  .thread{padding-top:20px}
+}
+@media (prefers-reduced-motion:reduce){
+  .caret{animation:none}
+  .scroll{scroll-behavior:auto}
+  .tip:hover{transform:none}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="side" id="side">
+    <div class="side-top">
+      <a class="logo" href="index.html"><i></i>Moon AI</a>
+      <span class="ver">0.1</span>
+    </div>
+    <div class="side-new">
+      <button class="btn wide" id="new-chat">+ Новый чат</button>
+    </div>
+    <div class="chats" id="chats"></div>
+    <div class="side-foot">
+      <div class="status-line"><span class="dot" id="dot"></span><span id="mode">проверяем связь…</span></div>
+      <button id="open-settings">Как это работает</button>
+      <button id="clear-all">Очистить историю</button>
+      <a href="index.html">← На сайт Moonscape</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="bar">
+      <button class="icon-btn side-toggle" id="side-toggle" aria-label="Меню">☰</button>
+      <div>
+        <h1>Moon AI</h1>
+        <div class="sub">версия 0.1 · ранняя сборка</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="icon-btn" id="new-chat-2" title="Новый чат" aria-label="Новый чат">＋</button>
+    </div>
+
+    <div class="scroll" id="scroll">
+      <div class="thread" id="thread"></div>
+      <div class="hello" id="hello">
+        <div class="orb"></div>
+        <h2>Чем помочь?</h2>
+        <p>Moon AI 0.1 — первая публичная версия нашей нейросети. Спросите что угодно: объясним,
+          напишем, разберём код. Ошибки возможны — проверяйте важные факты.</p>
+        <div class="tips" id="tips">
+          <button class="tip" data-q="Объясни простыми словами, как работает нейросеть"><b>Объяснить просто</b><span>как работает нейросеть</span></button>
+          <button class="tip" data-q="Напиши короткий пост в Telegram о запуске Moon AI 0.1"><b>Написать текст</b><span>пост о запуске Moon AI</span></button>
+          <button class="tip" data-q="Найди ошибку в этом коде и объясни, как её исправить:&#10;&#10;function sum(a, b) {&#10;  return a - b;&#10;}"><b>Разобрать код</b><span>найти ошибку и объяснить</span></button>
+          <button class="tip" data-q="Составь план на неделю для запуска небольшой инди-игры"><b>Составить план</b><span>запуск инди-игры</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="inner">
+        <div class="box">
+          <textarea id="input" rows="1" placeholder="Спросите Moon AI…" autocomplete="off"></textarea>
+          <button class="send" id="send" aria-label="Отправить">↑</button>
+        </div>
+        <div class="hint">
+          <span>Enter — отправить · Shift+Enter — новая строка</span>
+          <span id="counter">0</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="settings">
+  <div class="card">
+    <h3>Как работает Moon AI</h3>
+    <p>Запросы идут через сервер Moonscape: ключ доступа хранится на сервере и никогда не попадает
+      в браузер. Поэтому страницу нужно открывать по адресу сервера, а не как локальный файл.</p>
+    <label>Запуск на своей машине</label>
+    <pre class="how">node server.js
+→ http://localhost:8788/moonai.html</pre>
+    <div class="warn" id="settings-warn">Если статус слева горит оранжевым — сервер не отвечает.
+      Проверьте, что <code>node server.js</code> запущен и в файле <code>.env</code> указан ключ.</div>
+    <div class="row">
+      <button class="btn solid" id="settings-close">Понятно</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var LS_CHATS = 'moonai.chats.v1';
+  /* где искать сервер: сначала свой origin, затем запасные адреса.
+     Когда на VPS появится https (см. Caddy), первым в списке должен быть он. */
+  var API_FALLBACKS = ['https://moonai.qd.je', 'http://194.87.126.31:8787'];
+
+  var el = {
+    thread: document.getElementById('thread'),
+    hello: document.getElementById('hello'),
+    scroll: document.getElementById('scroll'),
+    input: document.getElementById('input'),
+    send: document.getElementById('send'),
+    counter: document.getElementById('counter'),
+    chats: document.getElementById('chats'),
+    dot: document.getElementById('dot'),
+    mode: document.getElementById('mode'),
+    settings: document.getElementById('settings')
+  };
+
+  var chats = load();
+  var current = chats[0] ? chats[0].id : null;
+  var online = false;
+  var streaming = null;         /* AbortController */
+
+  /* ---------------- хранилище ---------------- */
+  function load() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(LS_CHATS) || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) { return []; }
+  }
+  function save() {
+    try { localStorage.setItem(LS_CHATS, JSON.stringify(chats.slice(0, 60))); } catch (e) {}
+  }
+  function chat() {
+    var found = chats.filter(function (c) { return c.id === current; })[0];
+    if (!found) {
+      found = { id: 'c' + Date.now(), title: 'Новый чат', messages: [] };
+      chats.unshift(found);
+      current = found.id;
+    }
+    return found;
+  }
+
+  /* ---------------- копирование ---------------- */
+  /* navigator.clipboard доступен только на https и localhost,
+     поэтому для обычного http держим запасной путь */
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var box = document.createElement('textarea');
+        box.value = text;
+        box.setAttribute('readonly', '');
+        box.style.position = 'fixed';
+        box.style.top = '-1000px';
+        document.body.appendChild(box);
+        box.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(box);
+        ok ? resolve() : reject(new Error('copy failed'));
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function flash(button, done, back) {
+    button.textContent = done;
+    setTimeout(function () { button.textContent = back; }, 1400);
+  }
+
+  /* ---------------- markdown ---------------- */
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function inline(s) {
+    return s
+      .replace(/`([^`]+)`/g, function (m, c) { return '<code>' + c + '</code>'; })
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener nofollow">$1</a>');
+  }
+  function markdown(src) {
+    var text = escapeHtml(src);
+    var blocks = [];
+    text = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, function (m, lang, code) {
+      blocks.push('<pre><button class="copy-code" type="button">copy</button><code>' + code.replace(/\n$/, '') + '</code></pre>');
+      return '\u0000' + (blocks.length - 1) + '\u0000';
+    });
+
+    var lines = text.split('\n');
+    var out = [], list = null, para = [];
+
+    function flushPara() {
+      if (para.length) { out.push('<p>' + inline(para.join('<br>')) + '</p>'); para = []; }
+    }
+    function flushList() {
+      if (list) { out.push('<' + list.tag + '>' + list.items.join('') + '</' + list.tag + '>'); list = null; }
+    }
+
+    lines.forEach(function (line) {
+      var head = line.match(/^(#{1,3})\s+(.*)$/);
+      var bullet = line.match(/^\s*[-*•]\s+(.*)$/);
+      var num = line.match(/^\s*\d+[.)]\s+(.*)$/);
+      var quote = line.match(/^>\s?(.*)$/);
+
+      if (head) { flushPara(); flushList(); out.push('<h3>' + inline(head[2]) + '</h3>'); return; }
+      if (bullet || num) {
+        flushPara();
+        var tag = bullet ? 'ul' : 'ol';
+        if (!list || list.tag !== tag) { flushList(); list = { tag: tag, items: [] }; }
+        list.items.push('<li>' + inline((bullet || num)[1]) + '</li>');
+        return;
+      }
+      if (quote) { flushPara(); flushList(); out.push('<blockquote>' + inline(quote[1]) + '</blockquote>'); return; }
+      if (!line.trim()) { flushPara(); flushList(); return; }
+      flushList();
+      para.push(line);
+    });
+    flushPara();
+    flushList();
+
+    return out.join('').replace(/\u0000(\d+)\u0000/g, function (m, i) { return blocks[+i]; });
+  }
+
+  /* ---------------- отрисовка ---------------- */
+  function bubble(role, content, streamingNow) {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+    var who = document.createElement('div');
+    who.className = 'who';
+    who.textContent = role === 'user' ? 'ВЫ' : 'M';
+    var body = document.createElement('div');
+    body.className = 'body';
+    var name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = role === 'user' ? 'Вы' : 'Moon AI 0.1';
+    var text = document.createElement('div');
+    text.className = 'text';
+    if (role === 'user') text.textContent = content;
+    else text.innerHTML = markdown(content) + (streamingNow ? '<span class="caret"></span>' : '');
+    body.appendChild(name);
+    body.appendChild(text);
+
+    if (role !== 'user' && !streamingNow) {
+      var tools = document.createElement('div');
+      tools.className = 'tools';
+      var copy = document.createElement('button');
+      copy.className = 'tool';
+      copy.type = 'button';
+      copy.textContent = 'копировать';
+      copy.addEventListener('click', function () {
+        copyText(content).then(function () {
+          flash(copy, 'скопировано', 'копировать');
+        }).catch(function () {
+          flash(copy, 'не вышло', 'копировать');
+        });
+      });
+      tools.appendChild(copy);
+
+      var again = document.createElement('button');
+      again.className = 'tool';
+      again.type = 'button';
+      again.textContent = 'переспросить';
+      again.addEventListener('click', regenerate);
+      tools.appendChild(again);
+      body.appendChild(tools);
+    }
+
+    wrap.appendChild(who);
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  function draw() {
+    var c = chat();
+    el.thread.innerHTML = '';
+    c.messages.forEach(function (m) { el.thread.appendChild(bubble(m.role, m.content, false)); });
+    el.hello.style.display = c.messages.length ? 'none' : '';
+    drawChats();
+    bottom();
+  }
+
+  function drawChats() {
+    el.chats.innerHTML = '';
+    chats.forEach(function (c) {
+      var item = document.createElement('div');
+      item.className = 'chat-item' + (c.id === current ? ' on' : '');
+      var label = document.createElement('span');
+      label.textContent = c.title;
+      var del = document.createElement('button');
+      del.className = 'del';
+      del.type = 'button';
+      del.textContent = '×';
+      del.title = 'Удалить чат';
+      del.addEventListener('click', function (e) {
+        e.stopPropagation();
+        chats = chats.filter(function (x) { return x.id !== c.id; });
+        if (current === c.id) current = chats[0] ? chats[0].id : null;
+        save(); draw();
+      });
+      item.addEventListener('click', function () {
+        if (streaming) return;
+        current = c.id;
+        document.body.classList.remove('side-open');
+        draw();
+      });
+      item.appendChild(label);
+      item.appendChild(del);
+      el.chats.appendChild(item);
+    });
+  }
+
+  function bottom() {
+    el.scroll.scrollTop = el.scroll.scrollHeight;
+  }
+
+  function showError(message) {
+    var box = document.createElement('div');
+    box.className = 'err';
+    box.textContent = message;
+    el.thread.appendChild(box);
+    bottom();
+  }
+
+  /* ---------------- транспорт ---------------- */
+  var API_BASE = '';
+
+  function setMode(label, tone) {
+    el.mode.textContent = label;
+    el.dot.className = 'dot' + (tone ? ' ' + tone : '');
+  }
+
+  async function detect() {
+    for (var i = 0; i <= API_FALLBACKS.length; i++) {
+      var base = i === 0 ? '' : API_FALLBACKS[i - 1];
+      try {
+        var res = await fetch(base + '/api/config', { cache: 'no-store' });
+        if (!res.ok) continue;
+        var cfg = await res.json();
+        if (cfg && cfg.proxy && cfg.ready) {
+          API_BASE = base;
+          online = true;
+          setMode('модель на связи', 'live');
+          updateSend();
+          return;
+        }
+        if (cfg && cfg.proxy) { /* сервер есть, но ключи не заданы — дальше не ищем */ }
+      } catch (e) { /* адрес недоступен — пробуем следующий */ }
+    }
+    online = false;
+    setMode('нужен сервер', 'warn');
+    offlineNotice();
+  }
+
+  function offlineNotice(reason) {
+    updateSend();
+    if (document.querySelector('.err')) return;
+    showError((reason || 'Moon AI отвечает через сервер Moonscape, а он сейчас не доступен.') +
+      ' Мы уже знаем о проблеме — попробуйте чуть позже.');
+  }
+
+  function request(messages, signal) {
+    return fetch(API_BASE + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: messages }),
+      signal: signal
+    });
+  }
+
+  /* ---------------- отправка ---------------- */
+  async function ask(userText) {
+    if (!online) { offlineNotice(); return; }
+    var c = chat();
+    if (c.messages.length === 0) {
+      c.title = userText.slice(0, 38) + (userText.length > 38 ? '…' : '');
+    }
+    c.messages.push({ role: 'user', content: userText });
+    save();
+    draw();
+
+    var live = bubble('assistant', '', true);
+    el.thread.appendChild(live);
+    bottom();
+
+    var target = live.querySelector('.text');
+    var answer = '';
+    streaming = new AbortController();
+    toggleSend(true);
+
+    try {
+      var res = await request(c.messages.map(function (m) { return { role: m.role, content: m.content }; }), streaming.signal);
+
+      if (!res.ok) {
+        var detail = '';
+        try { detail = (await res.text()).slice(0, 300); } catch (e) {}
+        throw new Error('Сервис ответил ' + res.status + (detail ? ': ' + detail : ''));
+      }
+
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var done = false;
+
+      while (!done) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var parts = buffer.split('\n\n');
+        buffer = parts.pop();
+
+        for (var p = 0; p < parts.length && !done; p++) {
+          var rows = parts[p].split('\n');
+          for (var r = 0; r < rows.length; r++) {
+            var row = rows[r].trim();
+            if (row.indexOf('data:') !== 0) continue;
+            var payload = row.slice(5).trim();
+            if (payload === '[DONE]') { done = true; break; }
+            try {
+              var json = JSON.parse(payload);
+              var delta = json.choices && json.choices[0] && json.choices[0].delta;
+              var piece = delta && delta.content;
+              if (piece) {
+                answer += piece;
+                target.innerHTML = markdown(answer) + '<span class="caret"></span>';
+                bottom();
+              }
+            } catch (e) { /* игнорируем неполные кадры */ }
+          }
+        }
+      }
+
+      if (!answer) throw new Error('Пустой ответ от модели.');
+      c.messages.push({ role: 'assistant', content: answer });
+      save();
+      draw();
+    } catch (e) {
+      live.remove();
+      if (e && e.name === 'AbortError') {
+        if (answer) {
+          c.messages.push({ role: 'assistant', content: answer });
+          save();
+        }
+        draw();
+      } else {
+        draw();
+        showError(e && e.message ? e.message : 'Не удалось получить ответ.');
+      }
+    } finally {
+      streaming = null;
+      toggleSend(false);
+    }
+  }
+
+  function regenerate() {
+    if (streaming) return;
+    var c = chat();
+    while (c.messages.length && c.messages[c.messages.length - 1].role === 'assistant') c.messages.pop();
+    var last = c.messages.pop();
+    save();
+    draw();
+    if (last && last.role === 'user') ask(last.content);
+  }
+
+  function toggleSend(active) {
+    el.send.classList.toggle('stop', active);
+    el.send.textContent = active ? '■' : '↑';
+    el.send.disabled = active ? false : !(online && el.input.value.trim());
+  }
+
+  function updateSend() {
+    if (!streaming) toggleSend(false);
+    el.input.placeholder = online ? 'Спросите Moon AI…' : 'Сервер Moon AI не отвечает…';
+  }
+
+  /* ---------------- окно «как это работает» ---------------- */
+  function openSettings() { el.settings.classList.add('on'); }
+  function closeSettings() { el.settings.classList.remove('on'); }
+
+  document.getElementById('open-settings').addEventListener('click', openSettings);
+  document.getElementById('settings-close').addEventListener('click', closeSettings);
+  el.settings.addEventListener('click', function (e) { if (e.target === el.settings) closeSettings(); });
+
+  /* ---------------- события ---------------- */
+  function newChat() {
+    if (streaming) streaming.abort();
+    var fresh = { id: 'c' + Date.now(), title: 'Новый чат', messages: [] };
+    chats.unshift(fresh);
+    current = fresh.id;
+    save();
+    draw();
+    document.body.classList.remove('side-open');
+    el.input.focus();
+  }
+  document.getElementById('new-chat').addEventListener('click', newChat);
+  document.getElementById('new-chat-2').addEventListener('click', newChat);
+  document.getElementById('clear-all').addEventListener('click', function () {
+    if (!confirm('Удалить всю историю чатов?')) return;
+    chats = [];
+    current = null;
+    save();
+    draw();
+  });
+  document.getElementById('side-toggle').addEventListener('click', function () {
+    document.body.classList.toggle('side-open');
+  });
+
+  el.input.addEventListener('input', function () {
+    el.input.style.height = 'auto';
+    el.input.style.height = Math.min(el.input.scrollHeight, 190) + 'px';
+    el.counter.textContent = el.input.value.length;
+    if (!streaming) el.send.disabled = !(online && el.input.value.trim());
+  });
+
+  el.input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  el.send.addEventListener('click', function () {
+    if (streaming) { streaming.abort(); return; }
+    submit();
+  });
+
+  function submit() {
+    var text = el.input.value.trim();
+    if (!text || streaming) return;
+    el.input.value = '';
+    el.input.style.height = 'auto';
+    el.counter.textContent = '0';
+    el.send.disabled = true;
+    ask(text);
+  }
+
+  document.getElementById('tips').addEventListener('click', function (e) {
+    var tip = e.target.closest('.tip');
+    if (!tip) return;
+    el.input.value = tip.getAttribute('data-q');
+    el.input.dispatchEvent(new Event('input'));
+    el.input.focus();
+  });
+
+  el.thread.addEventListener('click', function (e) {
+    var btn = e.target.closest('.copy-code');
+    if (!btn) return;
+    var code = btn.parentNode.querySelector('code');
+    copyText(code.textContent).then(function () {
+      flash(btn, 'copied', 'copy');
+    }).catch(function () {
+      flash(btn, 'failed', 'copy');
+    });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeSettings(); document.body.classList.remove('side-open'); }
+  });
+
+  draw();
+  toggleSend(false);
+  detect();
+  el.input.focus();
+})();
+</script>
+</body>
+</html>
